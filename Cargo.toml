@@ -1,0 +1,30 @@
+[package]
+name = "sundials-sys"
+version = "0.1.0"
+authors = ["Jason Dark <email@jkdark.com>"]
+edition = "2018"
+links = "sundials"
+
+description = "A -sys crate for the SUNDIALS suite of ODE solvers"
+categories = ["external-ffi-bindings", "science"]
+repository = "https://github.com/jasondark/sundials-sys"
+license = "BSD-3-Clause"
+readme = "README.md"
+keywords = ["ode", "solver", "sundials", "differential"]
+
+[build-dependencies]
+bindgen = "0.42.3"
+cmake = "0.1.35"
+
+[features]
+default = ["arkode", "cvode", "cvodes", "ida", "idas", "kinsol"]
+arkode = []
+cvode = []
+cvodes = []
+ida = []
+idas = []
+kinsol = []
+openmp = []
+
+[dependencies]
+
