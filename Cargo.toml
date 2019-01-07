@@ -11,6 +11,7 @@ repository = "https://github.com/jasondark/sundials-sys"
 license = "BSD-3-Clause"
 readme = "README.md"
 keywords = ["ode", "solver", "sundials", "differential"]
+exclude = ["**/*.pdf"]
 
 [build-dependencies]
 bindgen = "0.42.3"
