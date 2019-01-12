@@ -42,7 +42,8 @@ fn main() {
         .define("BUILD_IDA", feature!("ida"))
         .define("BUILD_IDAS", feature!("idas"))
         .define("BUILD_KINSOL", feature!("kinsol"))
-        .define("OPENMP_ENABLE", feature!("openmp"))
+        .define("OPENMP_ENABLE", feature!("nvecopenmp"))
+        .define("PTHREAD_ENABLE", feature!("nvecpthreads"))
         .build();
 
     // Second, we let Cargo know about the library files
@@ -69,10 +70,7 @@ fn main() {
             })*
         }
     }
-    link! {"arkode", "cvode", "cvodes", "cvodes", "ida", "idas", "kinsol"}
-    if cfg!(feature = "openmp") {
-        println!("cargo:rustc-link-lib=dylib=sundials_nvecopenmp");
-    }
+    link! {"arkode", "cvode", "cvodes", "cvodes", "ida", "idas", "kinsol", "nvecopenmp", "nvecpthreads"}
 
     // Third, we use bindgen to generate the Rust types
 
@@ -97,7 +95,8 @@ fn main() {
             define!("ida", IDA),
             define!("idas", IDAS),
             define!("kinsol", KINSOL),
-            define!("openmp", OPENMP),
+            define!("nvecopenmp", OPENMP),
+            define!("nvecpthreads", PTHREADS),
         ])
         .parse_callbacks(Box::new(ParseSignedConstants))
         .generate()
