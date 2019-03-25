@@ -17,6 +17,19 @@ impl bindgen::callbacks::ParseCallbacks for ParseSignedConstants {
     }
 }
 
+
+// Get environment variable from string
+fn get_env_var(var_name: &str) -> Option<String> {
+    env::vars().filter_map(|t| {
+        let (key, value) = t;
+        if key == var_name {
+            Some(value)
+        } else {
+            None
+        }
+    }).next()
+}
+
 fn main() {
     // First, we build the SUNDIALS library, with requested modules with CMake
 
@@ -30,43 +43,69 @@ fn main() {
         };
     }
 
-    let dst = Config::new("vendor")
-        .define("CMAKE_INSTALL_LIBDIR", "lib")
-        .define("BUILD_STATIC_LIBS", "OFF")
-        .define("BUILD_SHARED_LIBS", "ON")
-        .define("BUILD_TESTING", "OFF")
-        .define("EXAMPLES_INSTALL", "OFF")
-        .define("BUILD_ARKODE", feature!("arkode"))
-        .define("BUILD_CVODE", feature!("cvode"))
-        .define("BUILD_CVODES", feature!("cvodes"))
-        .define("BUILD_IDA", feature!("ida"))
-        .define("BUILD_IDAS", feature!("idas"))
-        .define("BUILD_KINSOL", feature!("kinsol"))
-        .define("OPENMP_ENABLE", feature!("nvecopenmp"))
-        .define("PTHREAD_ENABLE", feature!("nvecpthreads"))
-        .build();
+    let static_libraries = feature!("static_libraries");
+    let shared_libraries = match static_libraries {
+        "ON" => "OFF",
+        "OFF" => "ON",
+        _ => "ON"
+    };
+    let library_type = match static_libraries {
+        "ON" => "static",
+        "OFF" => "dylib",
+        _ => "static"
+    };
+
+    let mut dst_dir = "".to_owned();
+    let mut lib_loc = Some("".to_owned());
+    let mut inc_dir = Some("".to_owned());
+    if cfg!(feature = "build_libraries") {
+        let dst = Config::new("vendor")
+            .define("CMAKE_INSTALL_LIBDIR", "lib")
+            .define("BUILD_STATIC_LIBS", static_libraries)
+            .define("BUILD_SHARED_LIBS", shared_libraries)
+            .define("BUILD_TESTING", "OFF")
+            .define("EXAMPLES_INSTALL", "OFF")
+            .define("BUILD_ARKODE", feature!("arkode"))
+            .define("BUILD_CVODE", feature!("cvode"))
+            .define("BUILD_CVODES", feature!("cvodes"))
+            .define("BUILD_IDA", feature!("ida"))
+            .define("BUILD_IDAS", feature!("idas"))
+            .define("BUILD_KINSOL", feature!("kinsol"))
+            .define("OPENMP_ENABLE", feature!("nvecopenmp"))
+            .define("PTHREAD_ENABLE", feature!("nvecpthreads"))
+            .build();
+        dst_dir = format!("{}", dst.display());
+        lib_loc = Some(format!("{}/lib", dst_dir));
+        inc_dir = Some(format!("{}/include", dst_dir));
+    } else {
+        lib_loc = get_env_var("SUNDIALS_LIBRARY_DIR"); 
+        inc_dir = get_env_var("SUNDIALS_INCLUDE_DIR");
+    }
 
     // Second, we let Cargo know about the library files
 
-    println!("cargo:rustc-link-search=native={}/lib", dst.display());
-    println!("cargo:rustc-link-lib=dylib=sundials_nvecserial");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunlinsolband");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunlinsoldense");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunlinsolpcg");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunlinsolspbcgs");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunlinsolspfgmr");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunlinsolspgmr");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunlinsolsptfqmr");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunmatrixband");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunmatrixdense");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunmatrixsparse");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunnonlinsolfixedpoint");
-    println!("cargo:rustc-link-lib=dylib=sundials_sunnonlinsolnewton");
+    match lib_loc {
+        Some(loc) => println!("cargo:rustc-link-search=native={}", loc), 
+        None => (),
+    }
+    println!("cargo:rustc-link-lib={}=sundials_nvecserial", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunlinsolband", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunlinsoldense", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunlinsolpcg", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunlinsolspbcgs", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunlinsolspfgmr", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunlinsolspgmr", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunlinsolsptfqmr", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunmatrixband", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunmatrixdense", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunmatrixsparse", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunnonlinsolfixedpoint", library_type);
+    println!("cargo:rustc-link-lib={}=sundials_sunnonlinsolnewton", library_type);
 
     macro_rules! link {
         ($($s:tt),*) => {
             $(if cfg!(feature = $s) {
-                println!("cargo:rustc-link-lib=dylib=sundials_{}", $s);
+                println!("cargo:rustc-link-lib={}=sundials_{}", library_type, $s);
             })*
         }
     }
@@ -87,7 +126,10 @@ fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindgen::Builder::default()
         .header("wrapper.h")
-        .clang_arg(format!("-I{}/include", dst.display()))
+        .clang_arg(match inc_dir {
+            Some(dir) => format!("-I{}", dir),
+            None => "".to_owned(),
+        })
         .clang_args(&[
             define!("arkode", ARKODE),
             define!("cvode", CVODE),
