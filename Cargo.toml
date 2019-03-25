@@ -18,7 +18,9 @@ bindgen = "0.42.3"
 cmake = "0.1.35"
 
 [features]
-default = ["arkode", "cvode", "ida", "kinsol"]
+default = ["static_libraries", "arkode", "cvode", "ida", "kinsol"]
+static_libraries = []
+build_libraries = []
 arkode = []
 cvode = []
 cvodes = []
